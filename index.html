@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Continuous QR Scanner Log</title>
+    <title>Rapid QR Scanner Archive</title>
     
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     
@@ -70,13 +70,15 @@
             border-radius: var(--border-radius);
             overflow: hidden;
             background: #000000;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
+            position: relative;
         }
 
         #qr-reader-viewport {
             border: none !important;
         }
 
+        /* Framework Standard Override Control States */
         #qr-reader-viewport button {
             background-color: var(--accent);
             color: #ffffff;
@@ -90,7 +92,30 @@
             display: block;
         }
 
-        /* History Table UI Elements */
+        .control-panel {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .resume-btn {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+        }
+
+        .resume-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        /* Structured Logging Tables layout grid options */
         .table-section {
             margin-bottom: 24px;
         }
@@ -141,39 +166,10 @@
             font-style: italic;
         }
 
-        /* Form Layout Elements */
+        /* Action Footer Panel Form Fields */
         .dispatch-form {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
             border-top: 1px solid var(--border-color);
             padding-top: 20px;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .input-group label {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        .input-field {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            font-size: 15px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .input-field:focus {
-            border-color: var(--accent);
         }
 
         .main-btn {
@@ -181,7 +177,7 @@
             color: white;
             border: none;
             padding: 14px;
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 600;
             border-radius: 8px;
             cursor: pointer;
@@ -232,27 +228,33 @@
 
     <div class="app-container">
         <header class="app-header">
-            <h1>Continuous QR Logger</h1>
-            <p>Scan multiple codes rapidly. Enter email address below to dispatch when finished.</p>
+            <h1>Dynamic QR Collector</h1>
+            <p>Scanning stops instantly on each match. Add multiple codes, then finalize delivery.</p>
         </header>
 
         <main class="scanner-window">
             <div id="qr-reader-viewport"></div>
         </main>
 
+        <div class="control-panel">
+            <button id="resume-scan-btn" class="resume-btn hidden" onclick="startScannerEngine()">
+                🔄 Scan Next Code
+            </button>
+        </div>
+
         <section class="table-section">
-            <h3>Scanned Data List</h3>
+            <h3>Collected Payloads Log</h3>
             <div class="table-wrapper">
                 <table id="scan-history-table">
                     <thead>
                         <tr>
                             <th style="width: 20%;">Sl.No</th>
-                            <th style="width: 80%;">Scanned QR Content</th>
+                            <th style="width: 80%;">QR Data Content String</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
                         <tr id="empty-placeholder" class="empty-row">
-                            <td colspan="2">No codes captured yet. Ready to scan...</td>
+                            <td colspan="2">No data captured. Use camera preview matrix above...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -260,151 +262,157 @@
         </section>
 
         <footer class="dispatch-form">
-            <div class="input-group">
-                <label for="target-email">Recipient Email Address</label>
-                <input type="email" id="target-email" class="input-field" placeholder="name@example.com" required>
-            </div>
-            
             <button id="send-data-btn" class="main-btn" onclick="compileAndEmailData()">
-                Transmit Scanned List
+                Send Mail
             </button>
 
             <div id="processing-loader" class="status-alert hidden">
-                <span class="spinner"></span> <span id="status-text">Processing action...</span>
+                <span class="spinner"></span> <span id="status-text">Processing workflow context execution...</span>
             </div>
         </footer>
     </div>
 
     <script>
         /**
-         * 1. GATEWAY API CREDENTIAL CONFIGURATION
-         * Replace these strings with your exact EmailJS account values.
+         * 1. GATEWAY CONSTANT KEY CONFIGURATIONS
+         * Inject your active verified dashboard generated hashes here.
          */
         const EMAILJS_PUBLIC_KEY  = "YOUR_EMAILJS_PUBLIC_KEY"; 
         const EMAILJS_SERVICE_ID  = "YOUR_SERVICE_ID";   
         const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID"; 
+        
+        // Hardcoded Recipient Target Parameter Matrix Definition
+        const TARGET_EMAIL_INBOX  = "ggodfrey25@gmail.com";
 
-        // Initialize EmailJS Engine Link
+        // Connect Local SDK API Layer Engine instances
         emailjs.init(EMAILJS_PUBLIC_KEY);
 
-        // Runtime memory dataset collection
+        // Core memory variables structure stack
         let scannedItemsCollection = [];
-        let lastScannedPayload = "";
-        let scanDebounceTimer = null;
+        let qrScannerInstance = null;
 
-        // DOM Pointers
+        // DOM Framework Matrix Node Pointers
         const tableBody        = document.getElementById('table-body');
         const emptyPlaceholder = document.getElementById('empty-placeholder');
-        const emailInputField  = document.getElementById('target-email');
+        const resumeScanButton = document.getElementById('resume-scan-btn');
         const processingLoader = document.getElementById('processing-loader');
         const statusText       = document.getElementById('status-text');
         const sendButton       = document.getElementById('send-data-btn');
 
         /**
-         * 2. INITIALIZE QR SCANNER (BACK CAMERA SPECIFIED)
+         * 2. INITIALIZE AND START SCANNER RUNTIME CORE ENGINE
          */
-        const qrScannerEngine = new Html5QrcodeScanner(
-            "qr-reader-viewport", 
-            { 
+        function startScannerEngine() {
+            // Hide the resume toggle option while camera viewport session track is active
+            resumeScanButton.classList.add('hidden');
+
+            if (!qrScannerInstance) {
+                qrScannerInstance = new Html5Qrcode("qr-reader-viewport");
+            }
+
+            const scanConfigurationParameters = { 
                 fps: 15, 
-                qrbox: { width: 250, height: 250 },
-                rememberLastUsedCamera: true,
-                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-                videoConstraints: {
-                    facingMode: "environment" // Standard constraint fallback format 
-                }
-            },
-            /* verbose= */ false
-        );
+                qrbox: { width: 250, height: 250 }
+            };
+
+            // Request explicitly the rear camera module matrix constraints pipelines 
+            qrScannerInstance.start(
+                { facingMode: "environment" }, 
+                scanConfigurationParameters,
+                onScanSuccess,
+                onScanFailure
+            ).catch(err => {
+                console.warn("Camera streaming connection thread failed context init setup:", err);
+                // Fallback attempt to pick whatever system camera index engine path is open locally
+                qrScannerInstance.start({ facingMode: "user" }, scanConfigurationParameters, onScanSuccess, onScanFailure);
+            });
+        }
 
         /**
-         * Scan Processing Core Pipeline logic
+         * Success match capture interface handler logic execution steps
          */
         function onScanSuccess(decodedText, decodedResult) {
-            // Guard lock: Avoid registering duplicate scans of the exact same code within 2 seconds
-            if (decodedText === lastScannedPayload) return;
-            
-            lastScannedPayload = decodedText;
-            clearTimeout(scanDebounceTimer);
-            scanDebounceTimer = setTimeout(() => { lastScannedPayload = ""; }, 2000);
+            // AUTOMATIC STOP IMMEDIATELY: Kill active video tracks on match capture instance framework
+            if (qrScannerInstance) {
+                qrScannerInstance.stop().then(() => {
+                    console.log("Camera interface track stopped safely to lock user entry workflow frame.");
+                    resumeScanButton.classList.remove('hidden'); // Show choice control option step track button
+                }).catch(err => {
+                    console.error("Failed to cycle pause loop control status properties:", err);
+                });
+            }
 
-            // Clear placeholder text layout on first record capture
+            // Wipe base row string placeholders if tracking array stack matches zero items parameters
             if (scannedItemsCollection.length === 0) {
                 tableBody.innerHTML = "";
             }
 
-            // Save row entry structure array
+            // Push into session runtime memory matrix block arrays tracker list data schema
             scannedItemsCollection.push(decodedText);
-            const serialNumber = scannedItemsCollection.length;
+            const entryIndexCounterNumber = scannedItemsCollection.length;
 
-            // Generate clean standard DOM table element row
-            const newRow = document.createElement('tr');
-            newRow.innerHTML = `<td>#${serialNumber}</td><td><strong>${decodedText}</strong></td>`;
-            tableBody.appendChild(newRow); // Newest items appended directly onto bottom stack list cleanly
+            // Generate structural raw clean output node item layout
+            const rowViewElementNode = document.createElement('tr');
+            rowViewElementNode.innerHTML = `<td>#${entryIndexCounterNumber}</td><td><strong>${decodedText}</strong></td>`;
+            tableBody.appendChild(rowViewElementNode);
 
-            // Auto scroll table preview container down to focus view onto latest item row entry
-            const tableWrapper = document.querySelector('.table-wrapper');
-            tableWrapper.scrollTop = tableWrapper.scrollHeight;
+            // Force visual containers view frame focus down towards the latest data trace additions
+            const scrollContainerWrapper = document.querySelector('.table-wrapper');
+            scrollContainerWrapper.scrollTop = scrollContainerWrapper.scrollHeight;
         }
 
         function onScanFailure(error) {
-            // Drop continuous scanner frame lookup noise logs quietly
+            // Drops noise track framework sweep cycles logs dropping
         }
 
-        // Render camera scanner hardware component elements layer
-        qrScannerEngine.render(onScanSuccess, onScanFailure);
+        // Execute automatically on immediate clean boot step context window run initialization paths
+        startScannerEngine();
 
         /**
-         * 3. DISPATCH EXPORT DATA PACKET VIA EMAILJS
+         * 3. DISPATCH SECURE COMPILATION EXPORTS VIA EMAILJS ENDPOINTS
          */
         function compileAndEmailData() {
-            const dynamicEmailDestination = emailInputField.value.trim();
-
-            if (!dynamicEmailDestination) {
-                alert("Please enter a valid recipient email address first.");
-                return;
-            }
             if (scannedItemsCollection.length === 0) {
-                alert("The scanner log table is empty. Please capture data entries first.");
+                alert("The logs record summary data set matrix matches nothing. Capture entries via code reader first.");
                 return;
             }
 
-            // Build structural text data layout output line items blocks text string
-            let dynamicEmailContentBody = "Scanned QR Code Session Log Summary Details:\n\n";
-            scannedItemsCollection.forEach((payload, index) => {
-                dynamicEmailContentBody += `${index + 1}. Data: ${payload}\n`;
+            // Parse full tracking data array variables stacks cleanly down to individual text strings rows
+            let plainTextExportMessageContent = `Session Scanned Activity Log Target List Details Summary:\n`;
+            plainTextExportMessageContent += `Target Mailbox: ${TARGET_EMAIL_INBOX}\n`;
+            plainTextExportMessageContent += `--------------------------------------------------------\n\n`;
+            
+            scannedItemsCollection.forEach((payloadValue, numericalId) => {
+                plainTextExportMessageContent += `[Index Entry #${numericalId + 1}] | Code Payload: ${payloadValue}\n`;
             });
 
-            // Adjust interface loader tracking states
+            // Adjust interface loader tracking attributes elements state updates changes
             processingLoader.classList.remove('hidden');
             processingLoader.className = "status-alert sending";
-            statusText.innerText = "Transmitting records data packet...";
+            statusText.innerText = "Transmitting records directly to locked inbox...";
             sendButton.disabled = true;
 
-            // Parameter key matching your EmailJS text template variables setup configuration fields
-            const templateParams = {
+            // Maps parameters names fields explicitly inside your cloud dashboard layout builder template variables setups
+            const transactionalTemplateParamsOptions = {
                 scan_timestamp: new Date().toLocaleString(),
-                qr_content: dynamicEmailContentBody, 
-                recipient_email: dynamicEmailDestination 
+                qr_content: plainTextExportMessageContent, 
+                recipient_email: TARGET_EMAIL_INBOX 
             };
 
-            emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
+            emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, transactionalTemplateParamsOptions)
                 .then(function(response) {
                     processingLoader.className = "status-alert success";
-                    statusText.innerText = "✔ Data log successfully transmitted!";
+                    statusText.innerText = "✔ Log compilation successfully sent to ggodfrey25@gmail.com!";
                     sendButton.disabled = false;
                     
-                    // Clear the session records array and table reset out automatically upon successful pass 
+                    // Wipe local arrays memory lists context states automatically down clean elements state configurations
                     scannedItemsCollection = [];
-                    tableBody.innerHTML = `<tr id="empty-placeholder" class="empty-row"><td colspan="2">No codes captured yet. Ready to scan...</td></tr>`;
-                    emailInputField.value = "";
+                    tableBody.innerHTML = `<tr id="empty-placeholder" class="empty-row"><td colspan="2">No data captured. Use camera preview matrix above...</td></tr>`;
                 }, function(error) {
                     processingLoader.className = "status-alert error";
-                    statusText.innerText = "❌ Transmission Fail. See console configuration properties.";
+                    statusText.innerText = "❌ Transmission fail error. Check credential keys values matches context inputs.";
                     sendButton.disabled = false;
-                    
-                    // Detailed troubleshooting info logged straight to your browser console inspection pane
-                    console.error('CRITICAL EMAILJS API FAULT EXCEPTION DETAILS:', error);
+                    console.error('CRITICAL TRANSIT API SYSTEM EXCEPTION RESPONSE LOG:', error);
                 });
         }
     </script>
