@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rapid QR Scanner Archive</title>
+    <title>Rapid QR Scanner & Exporter</title>
     
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     
@@ -19,6 +19,7 @@
             --accent-hover: #1d4ed8;
             --success: #16a34a;
             --error: #dc2626;
+            --csv-color: #0d9488;
             --border-radius: 12px;
             --border-color: #e2e8f0;
         }
@@ -78,7 +79,6 @@
             border: none !important;
         }
 
-        /* Framework Standard Override Control States */
         #qr-reader-viewport button {
             background-color: var(--accent);
             color: #ffffff;
@@ -115,7 +115,6 @@
             background-color: var(--accent-hover);
         }
 
-        /* Structured Logging Tables layout grid options */
         .table-section {
             margin-bottom: 24px;
         }
@@ -166,10 +165,19 @@
             font-style: italic;
         }
 
-        /* Action Footer Panel Form Fields */
+        /* Action Buttons Container Grid Layout */
         .dispatch-form {
             border-top: 1px solid var(--border-color);
             padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
         }
 
         .main-btn {
@@ -177,21 +185,33 @@
             color: white;
             border: none;
             padding: 14px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
             border-radius: 8px;
             cursor: pointer;
-            width: 100%;
-            transition: background 0.2s;
+            transition: opacity 0.2s;
         }
 
-        .main-btn:hover {
+        .csv-btn {
+            background-color: var(--csv-color);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .main-btn:hover, .csv-btn:hover {
             opacity: 0.9;
         }
 
-        .main-btn:disabled {
+        .main-btn:disabled, .csv-btn:disabled {
             background-color: var(--text-muted);
             cursor: not-allowed;
+            opacity: 0.6;
         }
 
         .status-alert {
@@ -203,7 +223,6 @@
             border-radius: 8px;
             font-size: 14px;
             font-weight: 500;
-            margin-top: 12px;
             background: #f1f5f9;
         }
 
@@ -229,7 +248,7 @@
     <div class="app-container">
         <header class="app-header">
             <h1>Dynamic QR Collector</h1>
-            <p>Scanning stops instantly on each match. Add multiple codes, then finalize delivery.</p>
+            <p>Scanning pauses instantly on match. Collect data, then mail or export directly.</p>
         </header>
 
         <main class="scanner-window">
@@ -262,9 +281,14 @@
         </section>
 
         <footer class="dispatch-form">
-            <button id="send-data-btn" class="main-btn" onclick="compileAndEmailData()">
-                Send Mail
-            </button>
+            <div class="btn-group">
+                <button id="send-data-btn" class="main-btn" onclick="compileAndEmailData()">
+                    Send Mail
+                </button>
+                <button id="export-csv-btn" class="csv-btn" onclick="exportLogToCSV()">
+                    Export CSV
+                </button>
+            </div>
 
             <div id="processing-loader" class="status-alert hidden">
                 <span class="spinner"></span> <span id="status-text">Processing workflow context execution...</span>
@@ -275,7 +299,7 @@
     <script>
         /**
          * 1. GATEWAY CONSTANT KEY CONFIGURATIONS
-         * Inject your active verified dashboard generated hashes here.
+         * Inject your verified case-sensitive EmailJS dashboard credentials here.
          */
         const EMAILJS_PUBLIC_KEY  = "YOUR_EMAILJS_PUBLIC_KEY"; 
         const EMAILJS_SERVICE_ID  = "YOUR_SERVICE_ID";   
@@ -298,12 +322,12 @@
         const processingLoader = document.getElementById('processing-loader');
         const statusText       = document.getElementById('status-text');
         const sendButton       = document.getElementById('send-data-btn');
+        const csvButton        = document.getElementById('export-csv-btn');
 
         /**
          * 2. INITIALIZE AND START SCANNER RUNTIME CORE ENGINE
          */
         function startScannerEngine() {
-            // Hide the resume toggle option while camera viewport session track is active
             resumeScanButton.classList.add('hidden');
 
             if (!qrScannerInstance) {
@@ -315,57 +339,53 @@
                 qrbox: { width: 250, height: 250 }
             };
 
-            // Request explicitly the rear camera module matrix constraints pipelines 
             qrScannerInstance.start(
                 { facingMode: "environment" }, 
                 scanConfigurationParameters,
                 onScanSuccess,
                 onScanFailure
             ).catch(err => {
-                console.warn("Camera streaming connection thread failed context init setup:", err);
-                // Fallback attempt to pick whatever system camera index engine path is open locally
+                console.warn("Camera streaming fallback context init:", err);
                 qrScannerInstance.start({ facingMode: "user" }, scanConfigurationParameters, onScanSuccess, onScanFailure);
             });
         }
 
         /**
-         * Success match capture interface handler logic execution steps
+         * Success match capture interface logic
          */
         function onScanSuccess(decodedText, decodedResult) {
-            // AUTOMATIC STOP IMMEDIATELY: Kill active video tracks on match capture instance framework
+            // AUTOMATIC STOP IMMEDIATELY: Pause camera view stream upon reading code
             if (qrScannerInstance) {
                 qrScannerInstance.stop().then(() => {
-                    console.log("Camera interface track stopped safely to lock user entry workflow frame.");
-                    resumeScanButton.classList.remove('hidden'); // Show choice control option step track button
+                    console.log("Camera engine paused safely.");
+                    resumeScanButton.classList.remove('hidden'); 
                 }).catch(err => {
-                    console.error("Failed to cycle pause loop control status properties:", err);
+                    console.error("Failed to cycle pause loop control:", err);
                 });
             }
 
-            // Wipe base row string placeholders if tracking array stack matches zero items parameters
             if (scannedItemsCollection.length === 0) {
                 tableBody.innerHTML = "";
             }
 
-            // Push into session runtime memory matrix block arrays tracker list data schema
+            // Push plain raw content string directly into stack
             scannedItemsCollection.push(decodedText);
             const entryIndexCounterNumber = scannedItemsCollection.length;
 
-            // Generate structural raw clean output node item layout
+            // Generate clean log layout record row
             const rowViewElementNode = document.createElement('tr');
             rowViewElementNode.innerHTML = `<td>#${entryIndexCounterNumber}</td><td><strong>${decodedText}</strong></td>`;
             tableBody.appendChild(rowViewElementNode);
 
-            // Force visual containers view frame focus down towards the latest data trace additions
             const scrollContainerWrapper = document.querySelector('.table-wrapper');
             scrollContainerWrapper.scrollTop = scrollContainerWrapper.scrollHeight;
         }
 
         function onScanFailure(error) {
-            // Drops noise track framework sweep cycles logs dropping
+            // Drop continuous scanner cycle updates quietly
         }
 
-        // Execute automatically on immediate clean boot step context window run initialization paths
+        // Execute automatically on immediate initial page load runtime
         startScannerEngine();
 
         /**
@@ -373,11 +393,10 @@
          */
         function compileAndEmailData() {
             if (scannedItemsCollection.length === 0) {
-                alert("The logs record summary data set matrix matches nothing. Capture entries via code reader first.");
+                alert("The scanner log table is currently empty. Scan codes before transmitting.");
                 return;
             }
 
-            // Parse full tracking data array variables stacks cleanly down to individual text strings rows
             let plainTextExportMessageContent = `Session Scanned Activity Log Target List Details Summary:\n`;
             plainTextExportMessageContent += `Target Mailbox: ${TARGET_EMAIL_INBOX}\n`;
             plainTextExportMessageContent += `--------------------------------------------------------\n\n`;
@@ -386,13 +405,11 @@
                 plainTextExportMessageContent += `[Index Entry #${numericalId + 1}] | Code Payload: ${payloadValue}\n`;
             });
 
-            // Adjust interface loader tracking attributes elements state updates changes
             processingLoader.classList.remove('hidden');
             processingLoader.className = "status-alert sending";
-            statusText.innerText = "Transmitting records directly to locked inbox...";
-            sendButton.disabled = true;
+            statusText.innerText = "Transmitting records to locked inbox...";
+            setButtonsDisabled(true);
 
-            // Maps parameters names fields explicitly inside your cloud dashboard layout builder template variables setups
             const transactionalTemplateParamsOptions = {
                 scan_timestamp: new Date().toLocaleString(),
                 qr_content: plainTextExportMessageContent, 
@@ -403,17 +420,67 @@
                 .then(function(response) {
                     processingLoader.className = "status-alert success";
                     statusText.innerText = "✔ Log compilation successfully sent to ggodfrey25@gmail.com!";
-                    sendButton.disabled = false;
-                    
-                    // Wipe local arrays memory lists context states automatically down clean elements state configurations
-                    scannedItemsCollection = [];
-                    tableBody.innerHTML = `<tr id="empty-placeholder" class="empty-row"><td colspan="2">No data captured. Use camera preview matrix above...</td></tr>`;
+                    setButtonsDisabled(false);
+                    clearSessionLog();
                 }, function(error) {
                     processingLoader.className = "status-alert error";
-                    statusText.innerText = "❌ Transmission fail error. Check credential keys values matches context inputs.";
-                    sendButton.disabled = false;
+                    statusText.innerText = "❌ Email transmission failed. Try exporting directly to CSV.";
+                    setButtonsDisabled(false);
                     console.error('CRITICAL TRANSIT API SYSTEM EXCEPTION RESPONSE LOG:', error);
                 });
+        }
+
+        /**
+         * 4. DIRECT LOCAL CLIENT-SIDE CSV FILE EXPORTER
+         */
+        function exportLogToCSV() {
+            if (scannedItemsCollection.length === 0) {
+                alert("No data available in the table to export.");
+                return;
+            }
+
+            // Build structural CSV text string block
+            // Excel parses double quotes ("") to handle internal commas smoothly inside cell records
+            let csvContentBody = "Serial Number,QR Code Data Content\n";
+            scannedItemsCollection.forEach((payloadValue, numericalId) => {
+                let cleanEscapedPayload = payloadValue.replace(/"/g, '""');
+                csvContentBody += `"${numericalId + 1}","${cleanEscapedPayload}"\n`;
+            });
+
+            // Convert string block text layout safely directly into a raw binary data object
+            const blobObj = new Blob([csvContentBody], { type: 'text/csv;charset=utf-8;' });
+            const anchorLink = document.createElement("a");
+            
+            // Generate temporary localized address context pointer link
+            const urlAddressPointer = URL.createObjectURL(blobObj);
+            const dateStamp = new Date().toISOString().slice(0,10);
+            
+            anchorLink.setAttribute("href", urlAddressPointer);
+            anchorLink.setAttribute("download", `QR_Scan_Log_${dateStamp}.csv`);
+            anchorLink.style.visibility = 'hidden';
+            
+            document.body.appendChild(anchorLink);
+            anchorLink.click(); // Programmatically execute file generation pull download command hook
+            document.body.removeChild(anchorLink);
+
+            // Notify User of instant local download completion path success
+            processingLoader.classList.remove('hidden');
+            processingLoader.className = "status-alert success";
+            statusText.innerText = "✔ CSV log file downloaded successfully!";
+            
+            // Optional auto reset: clear logs locally out upon export
+            clearSessionLog();
+        }
+
+        // Helper interface utilities switches
+        function setButtonsDisabled(stateValue) {
+            sendButton.disabled = stateValue;
+            csvButton.disabled = stateValue;
+        }
+
+        function clearSessionLog() {
+            scannedItemsCollection = [];
+            tableBody.innerHTML = `<tr id="empty-placeholder" class="empty-row"><td colspan="2">No data captured. Use camera preview matrix above...</td></tr>`;
         }
     </script>
 </body>
