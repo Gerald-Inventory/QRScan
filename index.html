@@ -66,6 +66,38 @@
             color: var(--text-muted);
         }
 
+        /* Form Controls Grouping */
+        .input-group {
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 12px;
+            font-size: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+            background-color: #fafafa;
+        }
+
+        .input-field:focus {
+            border-color: var(--accent);
+            background-color: #fff;
+        }
+
         .scanner-window {
             width: 100%;
             border-radius: var(--border-radius);
@@ -251,6 +283,11 @@
             <p>Scanning pauses instantly on match. Collect data, then mail or export directly.</p>
         </header>
 
+        <div class="input-group">
+            <label for="department-name">Target Department</label>
+            <input type="text" id="department-name" class="input-field" placeholder="Enter department name (e.g., Logistics, HR)...">
+        </div>
+
         <main class="scanner-window">
             <div id="qr-reader-viewport"></div>
         </main>
@@ -267,13 +304,14 @@
                 <table id="scan-history-table">
                     <thead>
                         <tr>
-                            <th style="width: 20%;">Sl.No</th>
-                            <th style="width: 80%;">QR Data Content String</th>
+                            <th style="width: 15%;">Sl.No</th>
+                            <th style="width: 35%;">Department</th>
+                            <th style="width: 50%;">QR Data Content String</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
                         <tr id="empty-placeholder" class="empty-row">
-                            <td colspan="2">No data captured. Use camera preview matrix above...</td>
+                            <td colspan="3">No data captured. Use camera preview matrix above...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -323,6 +361,7 @@
         const statusText       = document.getElementById('status-text');
         const sendButton       = document.getElementById('send-data-btn');
         const csvButton        = document.getElementById('export-csv-btn');
+        const departmentInput  = document.getElementById('department-name');
 
         /**
          * 2. INITIALIZE AND START SCANNER RUNTIME CORE ENGINE
@@ -368,13 +407,24 @@
                 tableBody.innerHTML = "";
             }
 
-            // Push plain raw content string directly into stack
-            scannedItemsCollection.push(decodedText);
+            // Extract values and handle empty fallback labels securely
+            const currentDepartment = departmentInput.value.trim() || "N/A";
+
+            // Push an analytical entity object directly into runtime tracker stack
+            scannedItemsCollection.push({
+                department: currentDepartment,
+                payload: decodedText
+            });
+
             const entryIndexCounterNumber = scannedItemsCollection.length;
 
-            // Generate clean log layout record row
+            // Generate clean structural log layout row targeting 3 distinct cells
             const rowViewElementNode = document.createElement('tr');
-            rowViewElementNode.innerHTML = `<td>#${entryIndexCounterNumber}</td><td><strong>${decodedText}</strong></td>`;
+            rowViewElementNode.innerHTML = `
+                <td>#${entryIndexCounterNumber}</td>
+                <td>${escapeHtml(currentDepartment)}</td>
+                <td><strong>${escapeHtml(decodedText)}</strong></td>
+            `;
             tableBody.appendChild(rowViewElementNode);
 
             const scrollContainerWrapper = document.querySelector('.table-wrapper');
@@ -383,6 +433,11 @@
 
         function onScanFailure(error) {
             // Drop continuous scanner cycle updates quietly
+        }
+
+        // Mini escaping utility function to safely insert inputs to raw UI structures
+        function escapeHtml(string) {
+            return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         // Execute automatically on immediate initial page load runtime
@@ -401,8 +456,8 @@
             plainTextExportMessageContent += `Target Mailbox: ${TARGET_EMAIL_INBOX}\n`;
             plainTextExportMessageContent += `--------------------------------------------------------\n\n`;
             
-            scannedItemsCollection.forEach((payloadValue, numericalId) => {
-                plainTextExportMessageContent += `[Index Entry #${numericalId + 1}] | Code Payload: ${payloadValue}\n`;
+            scannedItemsCollection.forEach((item, numericalId) => {
+                plainTextExportMessageContent += `[Index Entry #${numericalId + 1}] | Dept: ${item.department} | Code Payload: ${item.payload}\n`;
             });
 
             processingLoader.classList.remove('hidden');
@@ -419,7 +474,7 @@
             emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, transactionalTemplateParamsOptions)
                 .then(function(response) {
                     processingLoader.className = "status-alert success";
-                    statusText.innerText = "✔ Log compilation successfully sent to ggodfrey25@gmail.com!";
+                    statusText.innerText = `✔ Log compilation successfully sent to ${TARGET_EMAIL_INBOX}!`;
                     setButtonsDisabled(false);
                     clearSessionLog();
                 }, function(error) {
@@ -439,12 +494,12 @@
                 return;
             }
 
-            // Build structural CSV text string block
-            // Excel parses double quotes ("") to handle internal commas smoothly inside cell records
-            let csvContentBody = "Serial Number,QR Code Data Content\n";
-            scannedItemsCollection.forEach((payloadValue, numericalId) => {
-                let cleanEscapedPayload = payloadValue.replace(/"/g, '""');
-                csvContentBody += `"${numericalId + 1}","${cleanEscapedPayload}"\n`;
+            // Build structural multi-column CSV text string block
+            let csvContentBody = "Serial Number,Department,QR Code Data Content\n";
+            scannedItemsCollection.forEach((item, numericalId) => {
+                let cleanEscapedDept = item.department.replace(/"/g, '""');
+                let cleanEscapedPayload = item.payload.replace(/"/g, '""');
+                csvContentBody += `"${numericalId + 1}","${cleanEscapedDept}","${cleanEscapedPayload}"\n`;
             });
 
             // Convert string block text layout safely directly into a raw binary data object
@@ -480,7 +535,7 @@
 
         function clearSessionLog() {
             scannedItemsCollection = [];
-            tableBody.innerHTML = `<tr id="empty-placeholder" class="empty-row"><td colspan="2">No data captured. Use camera preview matrix above...</td></tr>`;
+            tableBody.innerHTML = `<tr id="empty-placeholder" class="empty-row"><td colspan="3">No data captured. Use camera preview matrix above...</td></tr>`;
         }
     </script>
 </body>
