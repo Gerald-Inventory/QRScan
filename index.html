@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rapid Barcode & QR Scanner</title>
     
-    <!-- CDN Includes for Core Engines -->
+    <!-- Core Engines -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
@@ -104,6 +104,7 @@
             background: #000000;
             margin-bottom: 12px;
             position: relative;
+            min-height: 300px;
         }
 
         #qr-reader-viewport {
@@ -278,12 +279,12 @@
     <div class="app-container">
         <header class="app-header">
             <h1>Dynamic Barcode & QR Collector</h1>
-            <p>Pauses instantly on detection. Ready for alphanumeric industrial barcodes & QR codes.</p>
+            <p>Optimized for alphanumeric industrial barcodes (Code 128) & QR codes.</p>
         </header>
 
         <div class="input-group">
             <label for="department-name">Target Department</label>
-            <input type="text" id="department-name" class="input-field" placeholder="Enter department name (e.g., Logistics, HR)...">
+            <input type="text" id="department-name" class="input-field" placeholder="Enter department name...">
         </div>
 
         <main class="scanner-window">
@@ -309,7 +310,7 @@
                     </thead>
                     <tbody id="table-body">
                         <tr id="empty-placeholder" class="empty-row">
-                            <td colspan="3">No data captured. Use camera preview matrix above...</td>
+                            <td colspan="3">No data captured. Use camera preview above...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -333,20 +334,17 @@
     </div>
 
     <script>
-        // --- 1. CONFIGURATION KEYS SETUP ---
+        // --- CONFIGURATION ---
         const EMAILJS_PUBLIC_KEY  = "YOUR_EMAILJS_PUBLIC_KEY"; 
         const EMAILJS_SERVICE_ID  = "YOUR_SERVICE_ID";   
         const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID"; 
         const TARGET_EMAIL_INBOX  = "ggodfrey25@gmail.com";
 
-        // Initialize EmailJS Runtime 
         emailjs.init(EMAILJS_PUBLIC_KEY);
 
-        // Core State Containers
         let scannedItemsCollection = [];
         let qrScannerInstance = null;
 
-        // UI DOM Hooks
         const tableBody        = document.getElementById('table-body');
         const emptyPlaceholder = document.getElementById('empty-placeholder');
         const resumeScanButton = document.getElementById('resume-scan-btn');
@@ -357,68 +355,71 @@
         const departmentInput  = document.getElementById('department-name');
 
         /**
-         * 2. CORE ENGINE INITIALIZATION
-         * Configured explicitly to decode Code 128 logistics labels and QR codes
+         * INITIALIZE SCANNER ENGINE
          */
         function startScannerEngine() {
             resumeScanButton.classList.add('hidden');
 
+            // Detect if running on a non-secure local environment
+            if (window.location.protocol === 'file:') {
+                alert("🚨 Security Block: Web browsers block camera access when opening an HTML file directly (file:///).\n\nPlease run this file through a local server (like VS Code Live Server) or upload it to an HTTPS hosting environment to use the camera.");
+                return;
+            }
+
             if (!qrScannerInstance) {
-                // Initialize the decoder with explicit format targets and hardware acceleration
                 qrScannerInstance = new Html5Qrcode("qr-reader-viewport", {
                     verbose: false,
                     experimentalFeatures: {
-                        useBarCodeDetectorIfSupported: true
+                        useBarCodeDetectorIfSupported: true // Taps into native iOS/Android hardware decoding chips
                     },
                     formatsToSupport: [
-                        Html5QrcodeSupportedFormats.CODE_128,  // Captures alphanumeric text segments with dashes like "21045-HOME-A30008-S1"
-                        Html5QrcodeSupportedFormats.CODE_39,   // Secondary barcode standard
-                        Html5QrcodeSupportedFormats.QR_CODE,   // Matrix codes
-                        Html5QrcodeSupportedFormats.EAN_13,    // Retail products
+                        Html5QrcodeSupportedFormats.CODE_128,  // Captures "21045-HOME-A30008-S1" formats
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.QR_CODE,
+                        Html5QrcodeSupportedFormats.EAN_13,
                         Html5QrcodeSupportedFormats.UPC_A
                     ]
                 });
             }
 
-            // Media capture parameters targeting high density tracking profiles
-            const videoCaptureConstraints = {
-                facingMode: "environment",
-                width: { ideal: 1920 }, // High-res prevents barcode lines from fading or bleeding together
-                height: { ideal: 1080 }
-            };
-
+            // Using "ideal" targets lets the browser scale down smoothly if the hardware doesn't support 1080p,
+            // preventing the OverconstrainedError that causes cameras to hang or remain black.
             const engineConfigurationParameters = { 
-                fps: 20 // Faster evaluation cycles per second
+                fps: 20,
+                videoConstraints: {
+                    facingMode: "environment",
+                    width: { ideal: 1920 }, 
+                    height: { ideal: 1080 }
+                }
             };
 
             qrScannerInstance.start(
-                videoCaptureConstraints, 
+                { facingMode: "environment" }, 
                 engineConfigurationParameters,
                 onScanSuccess,
                 onScanFailure
             ).catch(err => {
-                console.warn("Primary high-res environment lens dropped. Initiating standard generic stream fallback:", err);
-                // Fallback implementation logic if hardware rejects 1080p constraints or environment camera flags
+                console.warn("Primary environment lens failed, attempting fallback loop:", err);
+                
+                // Low-spec fallback if strict camera settings are rejected
                 qrScannerInstance.start(
                     { facingMode: "user" }, 
                     { fps: 15 }, 
                     onScanSuccess, 
                     onScanFailure
-                );
+                ).catch(fallbackErr => {
+                    console.error("All camera pipelines rejected:", fallbackErr);
+                    alert("Unable to open the camera. Please confirm that you have granted camera permissions to this page in your browser settings.\n\nDetails: " + fallbackErr);
+                });
             });
         }
 
-        /**
-         * 3. SCAN MATCH PROCESSING CORE PIPELINE
-         */
         function onScanSuccess(decodedText, decodedResult) {
-            // Instantly stop streaming to avoid multi-trigger overlaps
             if (qrScannerInstance) {
                 qrScannerInstance.stop().then(() => {
-                    console.log("Camera engine safely paused.");
                     resumeScanButton.classList.remove('hidden'); 
                 }).catch(err => {
-                    console.error("Failed to execute camera stream loop cycle termination:", err);
+                    console.error("Failed to pause engine stream:", err);
                 });
             }
 
@@ -428,7 +429,6 @@
 
             const currentDepartment = departmentInput.value.trim() || "N/A";
 
-            // Save inside memory trace stack
             scannedItemsCollection.push({
                 department: currentDepartment,
                 payload: decodedText
@@ -436,7 +436,6 @@
 
             const entryIndexCounterNumber = scannedItemsCollection.length;
 
-            // Update user table view interface structure logs safely
             const rowViewElementNode = document.createElement('tr');
             rowViewElementNode.innerHTML = `
                 <td>#${entryIndexCounterNumber}</td>
@@ -445,25 +444,21 @@
             `;
             tableBody.appendChild(rowViewElementNode);
 
-            // Keep the log wrapper view pinned down to current entries
             const scrollContainerWrapper = document.querySelector('.table-wrapper');
             scrollContainerWrapper.scrollTop = scrollContainerWrapper.scrollHeight;
         }
 
         function onScanFailure(error) {
-            // Drop continuous scanner cycle updates quietly to free up UI execution context
+            // Silence frame analysis noise to prevent main thread blocking
         }
 
         function escapeHtml(string) {
             return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        // Initialize scanning execution loop on mount
+        // Initialize execution on mount
         startScannerEngine();
 
-        /**
-         * 4. WORKFLOW DISPATCH AND DATA PACKAGING PIPELINES
-         */
         function compileAndEmailData() {
             if (scannedItemsCollection.length === 0) {
                 alert("The scanner log table is currently empty. Scan codes before transmitting.");
@@ -499,7 +494,7 @@
                     processingLoader.className = "status-alert error";
                     statusText.innerText = "❌ Email transmission failed. Try exporting directly to CSV.";
                     setButtonsDisabled(false);
-                    console.error('CRITICAL TRANSIT API SYSTEM EXCEPTION RESPONSE LOG:', error);
+                    console.error('CRITICAL TRANSIT API SYSTEM EXCEPTION:', error);
                 });
         }
 
