@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rapid Barcode & QR Scanner</title>
+    <title>Rapid QR & Barcode Scanner</title>
     
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
@@ -276,8 +276,8 @@
 
     <div class="app-container">
         <header class="app-header">
-            <h1>Dynamic Barcode & QR Collector</h1>
-            <p>Scanning pauses instantly on match. Collect labels, then mail or export directly.</p>
+            <h1>Dynamic QR & Barcode Collector</h1>
+            <p>Scanning pauses instantly on match. Collect data, then mail or export directly.</p>
         </header>
 
         <div class="input-group">
@@ -353,36 +353,35 @@
         const departmentInput  = document.getElementById('department-name');
 
         /**
-         * INITIALIZE SCANNER WITH ALL COMMON BARCODE FORMATS + QR
+         * INITIALIZE AND START SCANNER ENGINE WITH MULTI-FORMAT BARCODE SUPPORT
          */
         function startScannerEngine() {
             resumeScanButton.classList.add('hidden');
 
+            // Define formats explicitly to scan all standard 1D and 2D barcode configurations
+            const supportedFormats = [
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.CODE_128,  // Used widely for alphanumeric data like your example
+                Html5QrcodeSupportedFormats.CODE_39,   // Standard industrial barcode format
+                Html5QrcodeSupportedFormats.EAN_13,    // Retail/Product barcodes
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.DATA_MATRIX,
+                Html5QrcodeSupportedFormats.ITF
+            ];
+
             if (!qrScannerInstance) {
-                // Initialize the base class supporting multi-format array configs
-                qrScannerInstance = new Html5Qrcode("qr-reader-viewport");
+                // Initialize passing the explicit formats array as the second argument
+                qrScannerInstance = new Html5Qrcode("qr-reader-viewport", { 
+                    formatsToSupport: supportedFormats 
+                });
             }
 
-            // Define formats explicitly to pick up standard linear barcodes + 2D codes
             const scanConfigurationParameters = { 
                 fps: 15, 
-                qrbox: function(viewfinderWidth, viewfinderHeight) {
-                    // Optimized layout aspect ratio for standard elongated barcodes
-                    return {
-                        width: Math.min(viewfinderWidth * 0.8, 400),
-                        height: Math.min(viewfinderHeight * 0.4, 180)
-                    };
-                },
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.QR_CODE,
-                    Html5QrcodeSupportedFormats.CODE_128,  // Common industrial alpha-numeric format
-                    Html5QrcodeSupportedFormats.CODE_39,   // Standard logistics format
-                    Html5QrcodeSupportedFormats.EAN_13,    // Retail systems
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.ITF        // Interleaved 2 of 5
-                ]
+                // Expanded bounding box dimensions slightly to comfortably catch wide linear 1D barcodes
+                qrbox: { width: 300, height: 180 } 
             };
 
             qrScannerInstance.start(
@@ -432,14 +431,13 @@
         }
 
         function onScanFailure(error) {
-            // Drop continuous tracking updates quietly to clear memory loops
+            // Drop continuous scanner cycle updates quietly
         }
 
         function escapeHtml(string) {
             return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        // Auto start engine on mount 
         startScannerEngine();
 
         function compileAndEmailData() {
@@ -505,7 +503,7 @@
             anchorLink.style.visibility = 'hidden';
             
             document.body.appendChild(anchorLink);
-            anchorLink.click(); 
+            anchorLink.click();
             document.body.removeChild(anchorLink);
 
             processingLoader.classList.remove('hidden');
