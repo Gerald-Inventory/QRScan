@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rapid QR Scanner & Exporter</title>
+    <title>Rapid Barcode & QR Scanner</title>
     
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
     <style>
@@ -66,7 +65,6 @@
             color: var(--text-muted);
         }
 
-        /* Form Controls Grouping */
         .input-group {
             margin-bottom: 16px;
             display: flex;
@@ -197,7 +195,6 @@
             font-style: italic;
         }
 
-        /* Action Buttons Container Grid Layout */
         .dispatch-form {
             border-top: 1px solid var(--border-color);
             padding-top: 20px;
@@ -279,8 +276,8 @@
 
     <div class="app-container">
         <header class="app-header">
-            <h1>Dynamic QR Collector</h1>
-            <p>Scanning pauses instantly on match. Collect data, then mail or export directly.</p>
+            <h1>Dynamic Barcode & QR Collector</h1>
+            <p>Scanning pauses instantly on match. Collect labels, then mail or export directly.</p>
         </header>
 
         <div class="input-group">
@@ -306,7 +303,7 @@
                         <tr>
                             <th style="width: 15%;">Sl.No</th>
                             <th style="width: 35%;">Department</th>
-                            <th style="width: 50%;">QR Data Content String</th>
+                            <th style="width: 50%;">Code Data Content String</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
@@ -335,25 +332,17 @@
     </div>
 
     <script>
-        /**
-         * 1. GATEWAY CONSTANT KEY CONFIGURATIONS
-         * Inject your verified case-sensitive EmailJS dashboard credentials here.
-         */
         const EMAILJS_PUBLIC_KEY  = "YOUR_EMAILJS_PUBLIC_KEY"; 
         const EMAILJS_SERVICE_ID  = "YOUR_SERVICE_ID";   
         const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID"; 
         
-        // Hardcoded Recipient Target Parameter Matrix Definition
         const TARGET_EMAIL_INBOX  = "ggodfrey25@gmail.com";
 
-        // Connect Local SDK API Layer Engine instances
         emailjs.init(EMAILJS_PUBLIC_KEY);
 
-        // Core memory variables structure stack
         let scannedItemsCollection = [];
         let qrScannerInstance = null;
 
-        // DOM Framework Matrix Node Pointers
         const tableBody        = document.getElementById('table-body');
         const emptyPlaceholder = document.getElementById('empty-placeholder');
         const resumeScanButton = document.getElementById('resume-scan-btn');
@@ -364,18 +353,36 @@
         const departmentInput  = document.getElementById('department-name');
 
         /**
-         * 2. INITIALIZE AND START SCANNER RUNTIME CORE ENGINE
+         * INITIALIZE SCANNER WITH ALL COMMON BARCODE FORMATS + QR
          */
         function startScannerEngine() {
             resumeScanButton.classList.add('hidden');
 
             if (!qrScannerInstance) {
+                // Initialize the base class supporting multi-format array configs
                 qrScannerInstance = new Html5Qrcode("qr-reader-viewport");
             }
 
+            // Define formats explicitly to pick up standard linear barcodes + 2D codes
             const scanConfigurationParameters = { 
                 fps: 15, 
-                qrbox: { width: 250, height: 250 }
+                qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    // Optimized layout aspect ratio for standard elongated barcodes
+                    return {
+                        width: Math.min(viewfinderWidth * 0.8, 400),
+                        height: Math.min(viewfinderHeight * 0.4, 180)
+                    };
+                },
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.CODE_128,  // Common industrial alpha-numeric format
+                    Html5QrcodeSupportedFormats.CODE_39,   // Standard logistics format
+                    Html5QrcodeSupportedFormats.EAN_13,    // Retail systems
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.ITF        // Interleaved 2 of 5
+                ]
             };
 
             qrScannerInstance.start(
@@ -389,11 +396,7 @@
             });
         }
 
-        /**
-         * Success match capture interface logic
-         */
         function onScanSuccess(decodedText, decodedResult) {
-            // AUTOMATIC STOP IMMEDIATELY: Pause camera view stream upon reading code
             if (qrScannerInstance) {
                 qrScannerInstance.stop().then(() => {
                     console.log("Camera engine paused safely.");
@@ -407,10 +410,8 @@
                 tableBody.innerHTML = "";
             }
 
-            // Extract values and handle empty fallback labels securely
             const currentDepartment = departmentInput.value.trim() || "N/A";
 
-            // Push an analytical entity object directly into runtime tracker stack
             scannedItemsCollection.push({
                 department: currentDepartment,
                 payload: decodedText
@@ -418,7 +419,6 @@
 
             const entryIndexCounterNumber = scannedItemsCollection.length;
 
-            // Generate clean structural log layout row targeting 3 distinct cells
             const rowViewElementNode = document.createElement('tr');
             rowViewElementNode.innerHTML = `
                 <td>#${entryIndexCounterNumber}</td>
@@ -432,20 +432,16 @@
         }
 
         function onScanFailure(error) {
-            // Drop continuous scanner cycle updates quietly
+            // Drop continuous tracking updates quietly to clear memory loops
         }
 
-        // Mini escaping utility function to safely insert inputs to raw UI structures
         function escapeHtml(string) {
             return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        // Execute automatically on immediate initial page load runtime
+        // Auto start engine on mount 
         startScannerEngine();
 
-        /**
-         * 3. DISPATCH SECURE COMPILATION EXPORTS VIA EMAILJS ENDPOINTS
-         */
         function compileAndEmailData() {
             if (scannedItemsCollection.length === 0) {
                 alert("The scanner log table is currently empty. Scan codes before transmitting.");
@@ -485,49 +481,40 @@
                 });
         }
 
-        /**
-         * 4. DIRECT LOCAL CLIENT-SIDE CSV FILE EXPORTER
-         */
         function exportLogToCSV() {
             if (scannedItemsCollection.length === 0) {
                 alert("No data available in the table to export.");
                 return;
             }
 
-            // Build structural multi-column CSV text string block
-            let csvContentBody = "Serial Number,Department,QR Code Data Content\n";
+            let csvContentBody = "Serial Number,Department,Code Data Content\n";
             scannedItemsCollection.forEach((item, numericalId) => {
                 let cleanEscapedDept = item.department.replace(/"/g, '""');
                 let cleanEscapedPayload = item.payload.replace(/"/g, '""');
                 csvContentBody += `"${numericalId + 1}","${cleanEscapedDept}","${cleanEscapedPayload}"\n`;
             });
 
-            // Convert string block text layout safely directly into a raw binary data object
             const blobObj = new Blob([csvContentBody], { type: 'text/csv;charset=utf-8;' });
             const anchorLink = document.createElement("a");
             
-            // Generate temporary localized address context pointer link
             const urlAddressPointer = URL.createObjectURL(blobObj);
             const dateStamp = new Date().toISOString().slice(0,10);
             
             anchorLink.setAttribute("href", urlAddressPointer);
-            anchorLink.setAttribute("download", `QR_Scan_Log_${dateStamp}.csv`);
+            anchorLink.setAttribute("download", `Scan_Log_${dateStamp}.csv`);
             anchorLink.style.visibility = 'hidden';
             
             document.body.appendChild(anchorLink);
-            anchorLink.click(); // Programmatically execute file generation pull download command hook
+            anchorLink.click(); 
             document.body.removeChild(anchorLink);
 
-            // Notify User of instant local download completion path success
             processingLoader.classList.remove('hidden');
             processingLoader.className = "status-alert success";
             statusText.innerText = "✔ CSV log file downloaded successfully!";
             
-            // Optional auto reset: clear logs locally out upon export
             clearSessionLog();
         }
 
-        // Helper interface utilities switches
         function setButtonsDisabled(stateValue) {
             sendButton.disabled = stateValue;
             csvButton.disabled = stateValue;
