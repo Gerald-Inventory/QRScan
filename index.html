@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rapid QR & Barcode Scanner</title>
+    <title>Rapid Barcode & QR Scanner</title>
     
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
@@ -276,8 +276,8 @@
 
     <div class="app-container">
         <header class="app-header">
-            <h1>Dynamic QR & Barcode Collector</h1>
-            <p>Scanning pauses instantly on match. Collect data, then mail or export directly.</p>
+            <h1>Dynamic Barcode & QR Collector</h1>
+            <p>Scanning pauses instantly on match. Collect labels, then mail or export directly.</p>
         </header>
 
         <div class="input-group">
@@ -353,35 +353,31 @@
         const departmentInput  = document.getElementById('department-name');
 
         /**
-         * INITIALIZE AND START SCANNER ENGINE WITH MULTI-FORMAT BARCODE SUPPORT
+         * INITIALIZE SCANNER ENGINE
          */
         function startScannerEngine() {
             resumeScanButton.classList.add('hidden');
 
-            // Define formats explicitly to scan all standard 1D and 2D barcode configurations
-            const supportedFormats = [
-                Html5QrcodeSupportedFormats.QR_CODE,
-                Html5QrcodeSupportedFormats.CODE_128,  // Used widely for alphanumeric data like your example
-                Html5QrcodeSupportedFormats.CODE_39,   // Standard industrial barcode format
-                Html5QrcodeSupportedFormats.EAN_13,    // Retail/Product barcodes
-                Html5QrcodeSupportedFormats.EAN_8,
-                Html5QrcodeSupportedFormats.UPC_A,
-                Html5QrcodeSupportedFormats.UPC_E,
-                Html5QrcodeSupportedFormats.DATA_MATRIX,
-                Html5QrcodeSupportedFormats.ITF
-            ];
-
             if (!qrScannerInstance) {
-                // Initialize passing the explicit formats array as the second argument
-                qrScannerInstance = new Html5Qrcode("qr-reader-viewport", { 
-                    formatsToSupport: supportedFormats 
+                // FIX 1: Formats must be passed inside the constructor option object, not start()
+                qrScannerInstance = new Html5Qrcode("qr-reader-viewport", {
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.QR_CODE,
+                        Html5QrcodeSupportedFormats.CODE_128,  // Matches alphanumeric formats like "21045-HOME-A30007-S1"
+                        Html5QrcodeSupportedFormats.CODE_39,   // Standard logistics code
+                        Html5QrcodeSupportedFormats.EAN_13,    // Retail barcodes
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
+                        Html5QrcodeSupportedFormats.ITF        // Interleaved 2 of 5
+                    ]
                 });
             }
 
+            // FIX 2: Omit 'qrbox' completely. This forces the scanner to parse the whole camera stream.
+            // Linear barcodes are long and skinny; locking them to a box makes alignment drop significantly.
             const scanConfigurationParameters = { 
-                fps: 15, 
-                // Expanded bounding box dimensions slightly to comfortably catch wide linear 1D barcodes
-                qrbox: { width: 300, height: 180 } 
+                fps: 15
             };
 
             qrScannerInstance.start(
@@ -431,13 +427,14 @@
         }
 
         function onScanFailure(error) {
-            // Drop continuous scanner cycle updates quietly
+            // Drop tracking frame errors quietly to clear main thread loop
         }
 
         function escapeHtml(string) {
             return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
+        // Auto start engine on mount 
         startScannerEngine();
 
         function compileAndEmailData() {
@@ -503,7 +500,7 @@
             anchorLink.style.visibility = 'hidden';
             
             document.body.appendChild(anchorLink);
-            anchorLink.click();
+            anchorLink.click(); 
             document.body.removeChild(anchorLink);
 
             processingLoader.classList.remove('hidden');
