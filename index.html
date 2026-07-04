@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rapid Barcode & QR Scanner</title>
     
+    <!-- CDN Includes for Core Engines -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
@@ -277,7 +278,7 @@
     <div class="app-container">
         <header class="app-header">
             <h1>Dynamic Barcode & QR Collector</h1>
-            <p>Scanning pauses instantly on match. Collect labels, then mail or export directly.</p>
+            <p>Pauses instantly on detection. Ready for alphanumeric industrial barcodes & QR codes.</p>
         </header>
 
         <div class="input-group">
@@ -332,17 +333,20 @@
     </div>
 
     <script>
+        // --- 1. CONFIGURATION KEYS SETUP ---
         const EMAILJS_PUBLIC_KEY  = "YOUR_EMAILJS_PUBLIC_KEY"; 
         const EMAILJS_SERVICE_ID  = "YOUR_SERVICE_ID";   
         const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID"; 
-        
         const TARGET_EMAIL_INBOX  = "ggodfrey25@gmail.com";
 
+        // Initialize EmailJS Runtime 
         emailjs.init(EMAILJS_PUBLIC_KEY);
 
+        // Core State Containers
         let scannedItemsCollection = [];
         let qrScannerInstance = null;
 
+        // UI DOM Hooks
         const tableBody        = document.getElementById('table-body');
         const emptyPlaceholder = document.getElementById('empty-placeholder');
         const resumeScanButton = document.getElementById('resume-scan-btn');
@@ -353,51 +357,68 @@
         const departmentInput  = document.getElementById('department-name');
 
         /**
-         * INITIALIZE SCANNER ENGINE
+         * 2. CORE ENGINE INITIALIZATION
+         * Configured explicitly to decode Code 128 logistics labels and QR codes
          */
         function startScannerEngine() {
             resumeScanButton.classList.add('hidden');
 
             if (!qrScannerInstance) {
-                // FIX 1: Formats must be passed inside the constructor option object, not start()
+                // Initialize the decoder with explicit format targets and hardware acceleration
                 qrScannerInstance = new Html5Qrcode("qr-reader-viewport", {
+                    verbose: false,
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: true
+                    },
                     formatsToSupport: [
-                        Html5QrcodeSupportedFormats.QR_CODE,
-                        Html5QrcodeSupportedFormats.CODE_128,  // Matches alphanumeric formats like "21045-HOME-A30007-S1"
-                        Html5QrcodeSupportedFormats.CODE_39,   // Standard logistics code
-                        Html5QrcodeSupportedFormats.EAN_13,    // Retail barcodes
-                        Html5QrcodeSupportedFormats.EAN_8,
-                        Html5QrcodeSupportedFormats.UPC_A,
-                        Html5QrcodeSupportedFormats.UPC_E,
-                        Html5QrcodeSupportedFormats.ITF        // Interleaved 2 of 5
+                        Html5QrcodeSupportedFormats.CODE_128,  // Captures alphanumeric text segments with dashes like "21045-HOME-A30008-S1"
+                        Html5QrcodeSupportedFormats.CODE_39,   // Secondary barcode standard
+                        Html5QrcodeSupportedFormats.QR_CODE,   // Matrix codes
+                        Html5QrcodeSupportedFormats.EAN_13,    // Retail products
+                        Html5QrcodeSupportedFormats.UPC_A
                     ]
                 });
             }
 
-            // FIX 2: Omit 'qrbox' completely. This forces the scanner to parse the whole camera stream.
-            // Linear barcodes are long and skinny; locking them to a box makes alignment drop significantly.
-            const scanConfigurationParameters = { 
-                fps: 15
+            // Media capture parameters targeting high density tracking profiles
+            const videoCaptureConstraints = {
+                facingMode: "environment",
+                width: { ideal: 1920 }, // High-res prevents barcode lines from fading or bleeding together
+                height: { ideal: 1080 }
+            };
+
+            const engineConfigurationParameters = { 
+                fps: 20 // Faster evaluation cycles per second
             };
 
             qrScannerInstance.start(
-                { facingMode: "environment" }, 
-                scanConfigurationParameters,
+                videoCaptureConstraints, 
+                engineConfigurationParameters,
                 onScanSuccess,
                 onScanFailure
             ).catch(err => {
-                console.warn("Camera streaming fallback context init:", err);
-                qrScannerInstance.start({ facingMode: "user" }, scanConfigurationParameters, onScanSuccess, onScanFailure);
+                console.warn("Primary high-res environment lens dropped. Initiating standard generic stream fallback:", err);
+                // Fallback implementation logic if hardware rejects 1080p constraints or environment camera flags
+                qrScannerInstance.start(
+                    { facingMode: "user" }, 
+                    { fps: 15 }, 
+                    onScanSuccess, 
+                    onScanFailure
+                );
             });
         }
 
+        /**
+         * 3. SCAN MATCH PROCESSING CORE PIPELINE
+         */
         function onScanSuccess(decodedText, decodedResult) {
+            // Instantly stop streaming to avoid multi-trigger overlaps
             if (qrScannerInstance) {
                 qrScannerInstance.stop().then(() => {
-                    console.log("Camera engine paused safely.");
+                    console.log("Camera engine safely paused.");
                     resumeScanButton.classList.remove('hidden'); 
                 }).catch(err => {
-                    console.error("Failed to cycle pause loop control:", err);
+                    console.error("Failed to execute camera stream loop cycle termination:", err);
                 });
             }
 
@@ -407,6 +428,7 @@
 
             const currentDepartment = departmentInput.value.trim() || "N/A";
 
+            // Save inside memory trace stack
             scannedItemsCollection.push({
                 department: currentDepartment,
                 payload: decodedText
@@ -414,6 +436,7 @@
 
             const entryIndexCounterNumber = scannedItemsCollection.length;
 
+            // Update user table view interface structure logs safely
             const rowViewElementNode = document.createElement('tr');
             rowViewElementNode.innerHTML = `
                 <td>#${entryIndexCounterNumber}</td>
@@ -422,21 +445,25 @@
             `;
             tableBody.appendChild(rowViewElementNode);
 
+            // Keep the log wrapper view pinned down to current entries
             const scrollContainerWrapper = document.querySelector('.table-wrapper');
             scrollContainerWrapper.scrollTop = scrollContainerWrapper.scrollHeight;
         }
 
         function onScanFailure(error) {
-            // Drop tracking frame errors quietly to clear main thread loop
+            // Drop continuous scanner cycle updates quietly to free up UI execution context
         }
 
         function escapeHtml(string) {
             return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        // Auto start engine on mount 
+        // Initialize scanning execution loop on mount
         startScannerEngine();
 
+        /**
+         * 4. WORKFLOW DISPATCH AND DATA PACKAGING PIPELINES
+         */
         function compileAndEmailData() {
             if (scannedItemsCollection.length === 0) {
                 alert("The scanner log table is currently empty. Scan codes before transmitting.");
